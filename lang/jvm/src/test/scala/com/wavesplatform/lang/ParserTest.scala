@@ -72,46 +72,56 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("priority in binary expressions") {
-    parseOne("1 == 0 || 3 == 2") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(0)),
+    parseOne("1 == 0 || 3 == 2") shouldBe BINARY_OP(0,
+                                                    0,
+                                                    BINARY_OP(0, 0, CONST_LONG(0, 0, 1), EQ_OP, CONST_LONG(0, 0, 0)),
                                                     OR_OP,
-                                                    BINARY_OP(CONST_LONG(3), EQ_OP, CONST_LONG(2)))
-    parseOne("3 + 2 > 2 + 1") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)),
+                                                    BINARY_OP(0, 0, CONST_LONG(0, 0, 3), EQ_OP, CONST_LONG(0, 0, 2)))
+    parseOne("3 + 2 > 2 + 1") shouldBe BINARY_OP(0,
+                                                 0,
+                                                 BINARY_OP(0, 0, CONST_LONG(0, 0, 3), SUM_OP, CONST_LONG(0, 0, 2)),
                                                  GT_OP,
-                                                 BINARY_OP(CONST_LONG(2), SUM_OP, CONST_LONG(1)))
-    parseOne("1 >= 0 || 3 > 2") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), GE_OP, CONST_LONG(0)),
+                                                 BINARY_OP(0, 0, CONST_LONG(0, 0, 2), SUM_OP, CONST_LONG(0, 0, 1)))
+    parseOne("1 >= 0 || 3 > 2") shouldBe BINARY_OP(0,
+                                                   0,
+                                                   BINARY_OP(0, 0, CONST_LONG(0, 0, 1), GE_OP, CONST_LONG(0, 0, 0)),
                                                    OR_OP,
-                                                   BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
+                                                   BINARY_OP(0, 0, CONST_LONG(0, 0, 3), GT_OP, CONST_LONG(0, 0, 2)))
   }
 
   property("bytestr expressions") {
     parseOne("false || sigVerify(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
-      FALSE,
+      0,
+      0,
+      FALSE(0, 0),
       OR_OP,
       FUNCTION_CALL(
-        "sigVerify",
+        0,
+        0,
+        PART.VALID(0, 0, "sigVerify"),
         List(
-          CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
-          CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
-          CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
+          CONST_BYTEVECTOR(0, 0, PART.VALID(0, 0, ByteVector(ScorexBase58.decode("333").get))),
+          CONST_BYTEVECTOR(0, 0, PART.VALID(0, 0, ByteVector(ScorexBase58.decode("222").get))),
+          CONST_BYTEVECTOR(0, 0, PART.VALID(0, 0, ByteVector(ScorexBase58.decode("111").get)))
         )
       )
     )
   }
 
   property("valid non-empty base58 definition") {
-    parseOne("base58'bQbp'") shouldBe CONST_BYTEVECTOR(ByteVector("foo".getBytes))
+    parseOne("base58'bQbp'") shouldBe CONST_BYTEVECTOR(0, 0, PART.VALID(0, 0, ByteVector("foo".getBytes)))
   }
 
   property("valid empty base58 definition") {
-    parseOne("base58''") shouldBe CONST_BYTEVECTOR(ByteVector.empty)
+    parseOne("base58''") shouldBe CONST_BYTEVECTOR(0, 0, PART.VALID(0, 0, ByteVector.empty))
   }
 
   property("invalid base58 definition") {
-    parseOne("base58' bQbp'") shouldBe CONST_BYTEVECTOR(PART.INVALID(" bQbp", "Can't parse Base58 string"))
+    parseOne("base58' bQbp'") shouldBe CONST_BYTEVECTOR(0, 0, PART.INVALID(0, 0, "Can't parse Base58 string"))
   }
 
   property("string is consumed fully") {
-    parseOne(""" "   fooo    bar" """) shouldBe CONST_STRING("   fooo    bar")
+    parseOne(""" "   fooo    bar" """) shouldBe CONST_STRING(0, 0, PART.VALID(0, 0, "   fooo    bar"))
   }
 
   property("string literal with unicode chars") {
@@ -123,7 +133,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
          | "$stringWithUnicodeChars"
          |
        """.stripMargin
-    ) shouldBe CONST_STRING(stringWithUnicodeChars)
+    ) shouldBe CONST_STRING(0, 0, stringWithUnicodeChars)
   }
 
   property("string literal with unicode chars in language") {
@@ -131,24 +141,24 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("should parse invalid unicode symbols") {
-    parseOne("\"\\uqwer\"") shouldBe CONST_STRING(PART.INVALID("\\uqwer", "Can't parse 'qwer' as HEX string in '\\uqwer'"))
+    parseOne("\"\\uqwer\"") shouldBe CONST_STRING(0, 0, PART.INVALID(0, 0, "\\uqwer", "Can't parse 'qwer' as HEX string in '\\uqwer'"))
   }
 
   property("should parse incomplete unicode symbol definition") {
-    parseOne("\"\\u12 test\"") shouldBe CONST_STRING(PART.INVALID("\\u12 test", "Incomplete UTF-8 symbol definition: '\\u12'"))
-    parseOne("\"\\u\"") shouldBe CONST_STRING(PART.INVALID("\\u", "Incomplete UTF-8 symbol definition: '\\u'"))
+    parseOne("\"\\u12 test\"") shouldBe CONST_STRING(0, 0, PART.INVALID(0, 0, "\\u12 test", "Incomplete UTF-8 symbol definition: '\\u12'"))
+    parseOne("\"\\u\"") shouldBe CONST_STRING(0, 0, PART.INVALID(0, 0, "\\u", "Incomplete UTF-8 symbol definition: '\\u'"))
   }
 
   property("string literal with special symbols") {
-    parseOne("\"\\t\"") shouldBe CONST_STRING("\t")
+    parseOne("\"\\t\"") shouldBe CONST_STRING(0, 0, "\t")
   }
 
   property("should parse invalid special symbols") {
-    parseOne("\"\\ test\"") shouldBe CONST_STRING(PART.INVALID("\\ test", "Unknown escaped symbol: '\\ '"))
+    parseOne("\"\\ test\"") shouldBe CONST_STRING(0, 0, PART.INVALID(0, 0, "\\ test", "Unknown escaped symbol: '\\ '"))
   }
 
   property("should parse incomplete special symbols") {
-    parseOne("\"foo \\\"") shouldBe CONST_STRING(PART.INVALID("foo \\", "Invalid escaped symbol: '\\'"))
+    parseOne("\"foo \\\"") shouldBe CONST_STRING(0, 0, PART.INVALID(0, 0, "foo \\", "Invalid escaped symbol: '\\'"))
   }
 
   property("reserved keywords are invalid variable names") {
@@ -156,14 +166,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       val script = s"""let $keyword = 1
                       |true""".stripMargin
       parseOne(script) shouldBe BLOCK(
-        LET(PART.INVALID(keyword, "keywords are restricted"), CONST_LONG(1), Seq.empty),
-        TRUE
+        0,
+        0,
+        LET(0, 0, PART.INVALID(0, 0, "keywords are restricted"), CONST_LONG(0, 0, 1), Seq.empty),
+        TRUE(0, 0)
       )
     }
 
     List("if", "then", "else", "let").foreach { keyword =>
       val script = s"$keyword + 1"
-      parseOne(script) shouldBe BINARY_OP(REF(PART.INVALID(keyword, "keywords are restricted")), BinaryOperation.SUM_OP, CONST_LONG(1))
+      parseOne(script) shouldBe BINARY_OP(0, 0, REF(0, 0, PART.INVALID(0, 0, "keywords are restricted")), BinaryOperation.SUM_OP, CONST_LONG(0, 0, 1))
     }
   }
 
@@ -190,65 +202,67 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("function call") {
-    parseOne("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_LONG(1), CONST_LONG(2)))
-    parseOne("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
+    parseOne("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL(0, 0, "FOO", List(CONST_LONG(0, 0, 1), CONST_LONG(0, 0, 2)))
+    parseOne("FOO(X)".stripMargin) shouldBe FUNCTION_CALL(0, 0, "FOO", List(REF(0, 0, "X")))
   }
 
   property("function call on curly braces") {
-    parseOne("{ 1 }(2, 3, 4)") shouldBe FUNCTION_CALL(
-      PART.INVALID("", "CONST_LONG(1) is not a function name"),
-      List(2, 3, 4).map(CONST_LONG(_))
-    )
+    parseOne("{ 1 }(2, 3, 4)") shouldBe FUNCTION_CALL(0,
+                                                      0,
+                                                      PART.INVALID(0, 0, "CONST_LONG(1) is not a function name"),
+                                                      List(2, 3, 4).map(CONST_LONG(0, 0, _)))
   }
 
   property("function call on round braces") {
     parseOne("(1)(2, 3, 4)") shouldBe FUNCTION_CALL(
-      PART.INVALID("", "CONST_LONG(1) is not a function name"),
-      List(2, 3, 4).map(CONST_LONG(_))
+      0,
+      0,
+      PART.INVALID(0, 0, "CONST_LONG(1) is not a function name"),
+      List(2, 3, 4).map(CONST_LONG(0, 0, _))
     )
   }
 
   property("isDefined/extract") {
-    parseOne("isDefined(X)") shouldBe FUNCTION_CALL("isDefined", List(REF("X")))
-    parseOne("if(isDefined(X)) then extract(X) else Y") shouldBe IF(
-      FUNCTION_CALL("isDefined", List(REF("X"))),
-      FUNCTION_CALL("extract", List(REF("X"))),
-      REF("Y")
-    )
+    parseOne("isDefined(X)") shouldBe FUNCTION_CALL(0, 0, "isDefined", List(REF(0, 0, "X")))
+    parseOne("if(isDefined(X)) then extract(X) else Y") shouldBe IF(0,
+                                                                    0,
+                                                                    FUNCTION_CALL(0, 0, "isDefined", List(REF(0, 0, "X"))),
+                                                                    FUNCTION_CALL(0, 0, "extract", List(REF(0, 0, "X"))),
+                                                                    REF(0, 0, "Y"))
   }
 
   property("getter") {
     isParsed("xxx   .yyy") shouldBe true
     isParsed("xxx.  yyy") shouldBe true
 
-    parseOne("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
+    parseOne("xxx.yyy") shouldBe GETTER(0, 0, REF(0, 0, "xxx"), "yyy")
     parseOne(
       """
         |
         | xxx.yyy
         |
       """.stripMargin
-    ) shouldBe GETTER(REF("xxx"), "yyy")
+    ) shouldBe GETTER(0, 0, REF(0, 0, "xxx"), "yyy")
 
-    parseOne("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parseOne("xxx(yyy).zzz") shouldBe GETTER(0, 0, FUNCTION_CALL(0, 0, "xxx", List(REF(0, 0, "yyy"))), "zzz")
     parseOne(
       """
         |
         | xxx(yyy).zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(0, 0, FUNCTION_CALL(0, 0, "xxx", List(REF(0, 0, "yyy"))), "zzz")
 
-    parseOne("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parseOne("(xxx(yyy)).zzz") shouldBe GETTER(0, 0, FUNCTION_CALL(0, 0, "xxx", List(REF(0, 0, "yyy"))), "zzz")
     parseOne(
       """
         |
         | (xxx(yyy)).zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(0, 0, FUNCTION_CALL("xxx", List(REF(0, 0, "yyy"))), "zzz")
 
-    parseOne("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parseOne("{xxx(yyy)}.zzz") shouldBe GETTER(0, 0, FUNCTION_CALL(0, 0, "xxx", List(REF(0, 0, "yyy"))), "zzz")
     parseOne(
       """
         |
@@ -257,7 +271,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(0, 0, FUNCTION_CALL(0, 0, "xxx", List(REF(0, 0, "yyy"))), "zzz")
 
     parseOne(
       """
@@ -268,13 +282,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(
-      BLOCK(
-        LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))), Seq.empty),
-        FUNCTION_CALL("xxx", List(REF("yyy")))
-      ),
-      "zzz"
-    )
+    ) shouldBe GETTER(0,
+                      0,
+                      BLOCK(0,
+                            0,
+                            LET(0, 0, "yyy", FUNCTION_CALL(0, 0, "aaa", List(REF(0, 0, "bbb"))), Seq.empty),
+                            FUNCTION_CALL(0, 0, "xxx", List(REF(0, 0, "yyy")))),
+                      "zzz")
   }
 
   property("crypto functions") {
@@ -284,10 +298,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     for (f <- hashFunctions) {
       parseOne(s"$f(base58'$encodedText')".stripMargin) shouldBe
-        FUNCTION_CALL(
-          f,
-          List(CONST_BYTEVECTOR(ByteVector(text.getBytes)))
-        )
+        FUNCTION_CALL(0, 0, f, List(CONST_BYTEVECTOR(0, 0, ByteVector(text.getBytes))))
     }
   }
 
@@ -299,11 +310,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |true""".stripMargin
 
     parseAll(script) shouldBe Seq(
-      BLOCK(
-        LET("C", CONST_LONG(1), Seq.empty),
-        REF("foo")
-      ),
-      INVALID("#@", CONST_LONG(2)),
+      BLOCK(0, 0, LET(0, 0, "C", CONST_LONG(0, 0, 1), Seq.empty), REF(0, 0, "foo")),
+      INVALID(0, 0, "#@", CONST_LONG(0, 0, 2)),
       TRUE
     )
   }
@@ -326,10 +334,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |true""".stripMargin
     parseOne(script) shouldBe INVALID(
       "#/",
-      BLOCK(
-        LET("C", CONST_LONG(1), Seq.empty),
-        TRUE
-      )
+      BLOCK(0, 0, LET(0, 0, "C", CONST_LONG(0, 0, 1), Seq.empty), TRUE(0, 0))
     )
   }
 
@@ -339,11 +344,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |true
         |# /""".stripMargin
     parseAll(script) shouldBe Seq(
-      BLOCK(
-        LET("C", CONST_LONG(1), Seq.empty),
-        TRUE
-      ),
-      INVALID("#/")
+      BLOCK(0, 0, LET(0, 0, PART.VALID(0, 0, "C"), CONST_LONG(0, 0, 1), Seq.empty), TRUE(0, 0)),
+      INVALID(0, 0, "#/")
     )
   }
 
@@ -357,8 +359,15 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }
         |
       """.stripMargin
-    parseOne(code) shouldBe MATCH(REF("tx"),
-                                  List(MATCH_CASE(Some("a"), List("TypeA"), CONST_LONG(0)), MATCH_CASE(Some("b"), List("TypeB"), CONST_LONG(1))))
+    parseOne(code) shouldBe MATCH(
+      0,
+      0,
+      REF(0, 0, PART.VALID(0, 0, "tx")),
+      List(
+        MATCH_CASE(0, 0, Some(PART.VALID(0, 0, "a")), List(PART.VALID(0, 0, "TypeA")), CONST_LONG(0, 0, 0)),
+        MATCH_CASE(0, 0, Some(PART.VALID(0, 0, "b")), List(PART.VALID(0, 0, "TypeB")), CONST_LONG(0, 0, 1))
+      )
+    )
   }
 
   property("multiple union type matching") {
@@ -371,9 +380,15 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }
         |
       """.stripMargin
-    parseOne(code) shouldBe MATCH(REF("tx"),
-                                  List(MATCH_CASE(Some("txa"), List("TypeA"), CONST_LONG(0)),
-                                       MATCH_CASE(Some("underscore"), List("TypeB", "TypeC"), CONST_LONG(1))))
+    parseOne(code) shouldBe MATCH(
+      0,
+      0,
+      REF(0, 0, PART.VALID(0, 0, "tx")),
+      List(
+        MATCH_CASE(0, 0, Some(PART.VALID(0, 0, "txa")), List(PART.VALID(0, 0, "TypeA")), CONST_LONG(0, 0, 0)),
+        MATCH_CASE(0, 0, Some(PART.VALID(0, 0, "underscore")), List(PART.VALID(0, 0, "TypeB"), PART.VALID(0, 0, "TypeC")), CONST_LONG(0, 0, 1))
+      )
+    )
   }
 
   property("matching expression") {
@@ -450,25 +465,27 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("pattern matching with invalid case - no expr is defined") {
     parseOne("match tx { case TypeA => } ") shouldBe MATCH(
-      REF("tx"),
+      0,
+      0,
+      REF(0, 0, PART, VALID(0, 0, "tx")),
       List(
-        MATCH_CASE(
-          Some(PART.VALID("TypeA")),
-          Seq.empty,
-          INVALID("expected expression")
-        )
+        MATCH_CASE(0, 0, Some(PART.VALID(0, 0, "TypeA")), Seq.empty, INVALID(0, 0, "expected expression"))
       )
     )
   }
 
   property("pattern matching with invalid case - no var is defined") {
     parseOne("match tx { case :TypeA => 1 } ") shouldBe MATCH(
-      REF("tx"),
+      0,
+      0,
+      REF(0, 0, PART.VALID(0, 0, "tx")),
       List(
         MATCH_CASE(
-          Some(PART.INVALID(":TypeA ", "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
+          0,
+          0,
+          Some(PART.INVALID(0, 0, "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
           Seq.empty,
-          CONST_LONG(1)
+          CONST_LONG(0, 0, 1)
         )
       )
     )
@@ -476,12 +493,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("pattern matching with invalid case - expression in variable definition") {
     parseOne("match tx { case 1 + 1 => 1 } ") shouldBe MATCH(
-      REF("tx"),
+      0,
+      0,
+      REF(0, 0, PART.VALID(0, 0, "tx")),
       List(
         MATCH_CASE(
-          Some(PART.INVALID("1 + 1 ", "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
+          0,
+          0,
+          Some(PART.INVALID(0, 0, "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
           List.empty,
-          CONST_LONG(1)
+          CONST_LONG(0, 0, 1)
         )
       )
     )
@@ -489,12 +510,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("pattern matching with default case - no type is defined, one separator") {
     parseOne("match tx { case _: | => 1 } ") shouldBe MATCH(
-      REF("tx"),
+      0,
+      0,
+      REF(0, 0, PART.VALID(0, 0, "tx")),
       List(
         MATCH_CASE(
+          0,
+          0,
           None,
-          Seq(PART.INVALID("| ", "the type for variable should be specified: `case varName: Type => expr`")),
-          CONST_LONG(1)
+          Seq(PART.INVALID(0, 0, "the type for variable should be specified: `case varName: Type => expr`")),
+          CONST_LONG(0, 0, 1)
         )
       )
     )
@@ -502,12 +527,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("pattern matching with default case - no type is defined, multiple separators") {
     parseOne("match tx { case  _: |||| => 1 } ") shouldBe MATCH(
-      REF("tx"),
+      0,
+      0,
+      REF(0, 0, PART.VALID(0, 0, "tx")),
       List(
         MATCH_CASE(
+          0,
+          0,
           None,
-          Seq(PART.INVALID("|||| ", "the type for variable should be specified: `case varName: Type => expr`")),
-          CONST_LONG(1)
+          Seq(PART.INVALID(0, 0, "the type for variable should be specified: `case varName: Type => expr`")),
+          CONST_LONG(0, 0, 1)
         )
       )
     )
