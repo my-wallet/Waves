@@ -52,7 +52,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     let txRecipient = addressFromRecipient(tx.recipient).bytes
     let txSender = addressFromPublicKey(tx.senderPk).bytes
 
-    let txToBob = ((txRecipient == Bob) && (sha256(tx.proofs[0]) == base58'$shaSecret') && (20 >= height) && sigVerify(tx.bodyBytes,tx.proofs[1],AlicesPK))
+    let txToBob = (txRecipient == Bob) && (sha256(tx.proofs[0]) == base58'$shaSecret') && (20 >= height)
     let backToAliceAfterHeight = ((height >= 21) && (txRecipient == Alice))
 
     txToBob || backToAliceAfterHeight
@@ -179,10 +179,4 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
-  protected def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.length).sum + 128
-    if (dataSize > 1024) {
-      fee * (dataSize / 1024 + 1)
-    } else fee
-  }
 }
