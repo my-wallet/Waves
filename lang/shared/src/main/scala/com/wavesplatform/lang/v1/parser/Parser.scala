@@ -26,8 +26,8 @@ object Parser {
   private val notEndOfString = CharPred(_ != '\"')
   private val specialSymbols = P("\\" ~~ notEndOfString.?)
 
-  private val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~ (NoCut(unicodeSymbolP) | specialSymbols).! ~ Index)
-  private val stringP: P[EXPR] = P(Index ~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~ Index)
+  private val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
+  private val stringP: P[EXPR] = P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
     .map {
       case (start, xs, end) =>
         var errors         = Vector.empty[String]
@@ -44,14 +44,14 @@ object Parser {
               } catch {
                 case _: NumberFormatException =>
                   consumedString.append(x)
-                  errors :+= s"Can't parse '$hexCode' as HEX string in '$x'"
+                  errors :+= s"can't parse '$hexCode' as HEX string in '$x'"
                 case _: IllegalArgumentException =>
                   consumedString.append(x)
-                  errors :+= s"Invalid UTF-8 symbol: '$x'"
+                  errors :+= s"invalid UTF-8 symbol: '$x'"
               }
             } else {
               consumedString.append(x)
-              errors :+= s"Incomplete UTF-8 symbol definition: '$x'"
+              errors :+= s"incomplete UTF-8 symbol definition: '$x'"
             }
           } else if (x.startsWith("\\")) {
             if (x.length == 2) {
@@ -62,12 +62,12 @@ object Parser {
                 case 'r' => "\r"
                 case 't' => "\t"
                 case _ =>
-                  errors :+= s"Unknown escaped symbol: '$x'"
+                  errors :+= s"""unknown escaped symbol: '$x'. The valid are \b, \f, \n, \r, \t"""
                   x
               })
             } else {
               consumedString.append(x)
-              errors :+= s"Invalid escaped symbol: '$x'"
+              errors :+= s"""invalid escaped symbol: '$x'. The valid are \b, \f, \n, \r, \t"""
             }
           } else {
             consumedString.append(x)
@@ -81,13 +81,13 @@ object Parser {
     }
     .map(Function.tupled(CONST_STRING))
 
-  private val varName: P[PART[String]] = (Index ~ (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).! ~ Index).map {
+  private val varName: P[PART[String]] = (Index ~~ (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(start, end, "keywords are restricted")
       else PART.VALID(start, end, x)
   }
 
-  private val invalid: P[INVALID] = P(Index ~ AnyChars(1).! ~ Index ~ fallBackExpr.?).map {
+  private val invalid: P[INVALID] = P(Index ~~ AnyChars(1).! ~~ Index ~~ fallBackExpr.?).map {
     case (start, xs, end, next) => foldInvalid(start, end, xs, next)
   }
 
@@ -96,20 +96,20 @@ object Parser {
     case x                                              => INVALID(start, end, xs, x)
   }
 
-  private val numberP: P[CONST_LONG] = P(Index ~ (CharIn("+-").rep(max = 1) ~ digit.repX(min = 1)).! ~ Index).map {
+  private val numberP: P[CONST_LONG] = P(Index ~~ (CharIn("+-").rep(max = 1) ~ digit.repX(min = 1)).! ~~ Index).map {
     case (start, x, end) => CONST_LONG(start, end, x.toLong)
   }
-  private val trueP: P[TRUE]        = P(Index ~ "true".! ~ Index).map { case (start, _, end) => TRUE(start, end) }
-  private val falseP: P[FALSE]      = P(Index ~ "true".! ~ Index).map { case (start, _, end) => FALSE(start, end) }
+  private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ Index).map { case (start, _, end) => TRUE(start, end) }
+  private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
   private val curlyBracesP: P[EXPR] = P("{" ~ fallBackExpr ~ "}")
-  private val letP: P[LET] = P(Index ~ "let" ~ varName ~ "=" ~ fallBackExpr ~ Index).map {
+  private val letP: P[LET] = P(Index ~~ "let" ~ varName ~ "=" ~ fallBackExpr ~~ Index).map {
     case (start, v, e, end) => LET(start, end, v, e, Seq.empty)
   }
   private val refP: P[REF] = P(varName).map { x =>
     REF(x.start, x.end, x)
   }
-  private val ifP: P[IF] = P(Index ~ "if" ~ bracesP ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~ Index).map {
+  private val ifP: P[IF] = P(Index ~~ "if" ~ bracesP ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
     case (start, x, y, z, end) => IF(start, end, x, y, z)
   }
 
@@ -128,22 +128,22 @@ object Parser {
     val typesP: P[Seq[PART[String]]]     = varName.rep(min = 1, sep = "|")
     val typesDefP = (
       ":" ~
-        (typesP | (Index ~ restMatchCaseInvalidP ~ Index).map {
-          case (start, x, end) => Seq(PART.INVALID(start, end, s"the type for variable should be specified: `case varName: Type => expr`, got: $x"))
+        (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
+          case (start, x, end) => Seq(PART.INVALID(start, end, "the type for variable should be specified: `case varName: Type => expr`"))
         })
     ).?.map(_.getOrElse(List.empty))
 
     P(
-      Index ~ "case" ~/ (
+      Index ~~ "case" ~/ (
         (varDefP ~ typesDefP) |
-          (Index ~ restMatchCaseInvalidP ~ Index).map {
+          (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, x, end) =>
               (
-                Some(PART.INVALID(start, end, s"invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`, got: $x")),
+                Some(PART.INVALID(start, end, "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
                 Seq.empty[PART[String]]
               )
           }
-      ) ~ "=>" ~/ baseExpr.? ~ Index
+      ) ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
       case (start, (v, types), e, end) =>
         val exprStart = types.lastOption.orElse(v).fold(start)(_.end)
@@ -157,7 +157,7 @@ object Parser {
     }
   }
 
-  private lazy val matchP: P[EXPR] = P(Index ~ "match" ~/ fallBackExpr ~ "{" ~ NoCut(matchCaseP).rep ~ "}" ~ Index)
+  private lazy val matchP: P[EXPR] = P(Index ~~ "match" ~/ fallBackExpr ~ "{" ~ NoCut(matchCaseP).rep ~ "}" ~~ Index)
     .map {
       case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
       case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
@@ -166,7 +166,7 @@ object Parser {
   private val accessP
     : P[Accessor] = P(("." ~~ varName).map(Getter) | ("(" ~/ functionCallArgs.map(Args) ~ ")")) | ("[" ~/ fallBackExpr.map(ListIndex) ~ "]")
 
-  private val maybeAccessP: P[EXPR] = P(Index ~ extractableAtom ~ Index ~~ NoCut(accessP).rep ~ Index).map {
+  private val maybeAccessP: P[EXPR] = P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).rep ~~ Index).map {
     case (start, e, accessIndex, f, end) =>
       f.foldLeft(e) { (e, a) =>
         a match {
@@ -174,7 +174,7 @@ object Parser {
           case Args(args) =>
             e match {
               case REF(_, _, functionName) => FUNCTION_CALL(start, end, functionName, args.toList)
-              case _                       => FUNCTION_CALL(start, end, PART.INVALID(start, accessIndex, s"$e is not a function name"), args.toList)
+              case _                       => FUNCTION_CALL(start, end, PART.INVALID(start, accessIndex, s"'$e' is not a function name"), args.toList)
             }
           case ListIndex(index) => FUNCTION_CALL(start, end, PART.VALID(start, accessIndex, "getElement"), List(e, index))
         }
@@ -182,19 +182,19 @@ object Parser {
   }
 
   private val byteVectorP: P[EXPR] =
-    P(Index ~ "base58'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~ Index)
+    P(Index ~~ "base58'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
       .map {
         case (start, xs, end) =>
           val decoded    = if (xs.isEmpty) Right(Array.emptyByteArray) else Global.base58Decode(xs)
           val innerStart = start + 8
           val innerEnd   = end - 1
           decoded match {
-            case Left(_)  => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, s"Can't parse Base58 string: $xs"))
+            case Left(_)  => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, "can't parse Base58 string"))
             case Right(r) => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
           }
       }
 
-  private val block: P[EXPR] = P(Index ~ letP ~ fallBackExpr ~ Index).map {
+  private val block: P[EXPR] = P(Index ~~ letP ~ fallBackExpr ~~ Index).map {
     case (start, l, e, end) => BLOCK(start, end, l, e)
   }
 
@@ -211,7 +211,7 @@ object Parser {
       case Nil => atom
       case (lessPriorityOp, kind) :: restOps =>
         val operand = aux(restOps)
-        P(Index ~ operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep() ~ Index).map {
+        P(Index ~~ operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep() ~~ Index).map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)], end) =>
             r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(start, end, acc, currKind, currOperand) }
         }
